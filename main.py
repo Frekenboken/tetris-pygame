@@ -1,4 +1,5 @@
 import os
+import random
 import sys
 import time
 
@@ -19,13 +20,38 @@ pygame.init()
 pygame.display.set_caption("Перемещение героя")
 screen = pygame.display.set_mode(SIZE)
 
-all_sprites = pygame.sprite.Group()
-box_group = pygame.sprite.Group()
-
-tile_width = tile_height = 50
-
 player = None
 
+def game_over_screen(score):
+    intro_text = ["ИГРА ОКОНЧЕНА", "",
+                  f"Ваш счет: {score}",
+                  "Нажмите R для перезапуска",
+                  "Нажмите Q для выхода"]
+
+    fon = pygame.transform.scale(load_image('Default.jpg'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+    font = pygame.font.Font(None, 30)
+    text_coord = 50
+    for line in intro_text:
+        string_rendered = font.render(line, 1, pygame.Color('white'))
+        intro_rect = string_rendered.get_rect()
+        text_coord += 10
+        intro_rect.top = text_coord
+        intro_rect.x = 10
+        text_coord += intro_rect.height
+        screen.blit(string_rendered, intro_rect)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    return True  # Перезапуск игры
+                elif event.key == pygame.K_q:
+                    terminate()  # Выход из игры
+        pygame.display.flip()
+        clock.tick(FPS)
 
 def start_screen():
     intro_text = ["ЗАСТАВКА", "",
@@ -33,7 +59,7 @@ def start_screen():
                   "Если в правилах несколько строк,",
                   "приходится выводить их построчно"]
 
-    fon = pygame.transform.scale(load_image('fon.jpg'), (WIDTH, HEIGHT))
+    fon = pygame.transform.scale(load_image('Default.jpg'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
     font = pygame.font.Font(None, 30)
     text_coord = 50
@@ -57,69 +83,73 @@ def start_screen():
         clock.tick(FPS)
 
 
-def generate_level(level):
-    new_player, x, y = None, None, None
-    player_x, player_y = None, None
-    for y in range(len(level)):
-        for x in range(len(level[y])):
-            if level[y][x] == '.':
-                Tile('empty', x, y)
-            elif level[y][x] == '#':
-                Box('wall', x, y)
-            elif level[y][x] == '@':
-                Tile('empty', x, y)
-                player_x, player_y = x, y
-    new_player = Player(player_x, player_y)
-    return new_player, x, y
+import pygame
+
+# Размер клетки по умолчанию
+CELL_SIZE = 30
+
+class Segment(pygame.sprite.Sprite):
+    def __init__(self, sprite_group, pos_x, pos_y, color, scale=1.0):
+        super().__init__(sprite_group)
+        self.scale = scale
+        self.image = pygame.Surface((int(28 * scale), int(28 * scale)))
+        self.image.fill(color)
+        self.x, self.y = pos_x, pos_y
+        self.rect = self.image.get_rect().move(self.x * CELL_SIZE * scale + 1, self.y * CELL_SIZE * scale + 1)
+
+    def move(self, x, y, cell_based=True):
+        if cell_based:
+            self.x += x
+            self.y += y
+            self.rect = self.rect.move(x * CELL_SIZE * self.scale, y * CELL_SIZE * self.scale)
+        else:
+            self.rect = self.rect.move(x, y)
+
+    def set_position(self, x, y, cell_based=True):
+        if cell_based:
+            self.x, self.y = x, y
+            self.rect = self.image.get_rect().move(x * CELL_SIZE * self.scale + 1, y * CELL_SIZE * self.scale + 1)
+        else:
+            self.rect.topleft = (x, y)
 
 
-class Shape(pygame.sprite.Sprite):
-    def __init__(self, block_size, shape, color):
+class Shape(pygame.sprite.Group):
+    def __init__(self, shape, color, scale=1.0):
         super().__init__()
-        self.block_size = block_size
         self.shape = shape
         self.color = color
-        self.image = self.create_image()
-        self.rect = self.image.get_rect()
+        self.scale = scale
+        self.x, self.y = 0, 0
 
-        self.size = (self.rect.width // self.block_size, self.rect.height // self.block_size)
-        self.width = self.size[0]
-        self.height = self.size[1]
+        self.make()
 
-    def create_image(self):
-        width = len(self.shape[0]) * self.block_size
-        height = len(self.shape) * self.block_size
-        image = pygame.Surface((width, height), pygame.SRCALPHA)
+    def make(self):
+        self.empty()
         for y, row in enumerate(self.shape):
             for x, cell in enumerate(row):
                 if cell:
-                    pygame.draw.rect(image, self.color,
-                                     pygame.Rect(x * self.block_size + 1 , y * self.block_size + 1, self.block_size - 2,
-                                                 self.block_size - 2))
-        return image
+                    Segment(self, self.x + x, self.y + y, self.color, self.scale)
 
-    def rotate(self):
-        self.shape = rotate_matrix(self.shape)
-        self.image = self.create_image()
+    def move(self, x, y, cell_based=True):
+        if cell_based:
+            self.x += x
+            self.y += y
+        for segment in self:
+            segment.move(x, y, cell_based)
 
-    def fall(self):
-        self.rect = self.rect.move(0, self.block_size)
+    def set_position(self, x, y, cell_based=True):
+        if cell_based:
+            self.x, self.y = x, y
+        self.make()
+        for segment in self:
+            segment.set_position(self.x + (segment.x - self.x), self.y + (segment.y - self.y), cell_based)
 
-    def move_right(self):
-        self.rect = self.rect.move(self.block_size, 0)
-
-    def move_left(self):
-        self.rect = self.rect.move(-self.block_size, 0)
-
-    def move(self, cell_x, cell_y):
-        self.rect = self.rect.move(cell_x * self.block_size, cell_y * self.block_size)
-
-    def draw(self, surface):
-        surface.blit(self.image, self.rect.topleft)
+    def set_scale(self, scale):
+        self.scale = scale
+        self.make()
 
 
 class Field(Surface):
-    # создание поля
     def __init__(self, x, y, width, height):
         self.x, self.y = x, y
         self.width = width
@@ -127,11 +157,15 @@ class Field(Surface):
         self.board = [[0] * width for _ in range(height)]
         self.cell_size = cell_size
 
-        self.shapes = []
-        self.active_shape: Shape | None = None
+        self.cells = pygame.sprite.Group()
+        self.next_shape = self.get_random_shape()
+        self.shape: Shape | None = None
         super().__init__((width * self.cell_size, height * self.cell_size))
 
         self.last_fall_time = time.time()
+        self.tick = 0.7
+        self.score = 0
+        self.run = False
 
     def draw(self, surface):
         self.fill(colors.BLACK)
@@ -139,8 +173,8 @@ class Field(Surface):
         for y in range(self.height):
             for x in range(self.width):
                 pygame.draw.rect(self, colors.GRAY, (cell * x, cell * y, cell, cell), width=1)
-        for shape in self.shapes:
-            shape.draw(self)
+        self.cells.draw(self)
+        self.shape.draw(self)
 
         surface.blit(self, (self.x, self.y))
 
@@ -160,27 +194,90 @@ class Field(Surface):
     def on_click(self, cell):
         print(cell)
 
-    def new_shape(self, shape, color):
-        new_shape = Shape(self.cell_size, shape, color)
-        new_shape.move(self.width // 2 - new_shape.width // 2, 0)
-        self.shapes.append(new_shape)
-        self.active_shape = new_shape
-
-        new_shape = Shape(self.cell_size, shape, color)
-        new_shape.move(self.width // 2 - new_shape.width // 2, 10)
-        self.shapes.append(new_shape)
-
     def update(self):
-        if self.active_shape.rect.collidelistall(self.shapes):
+        if self.run:
+            if time.time() - self.last_fall_time > self.tick:
+                self.shape.move(0, 1)
 
-            self.shapes.append(self.active_shape)
-            self.new_shape(tetris_shapes["L"], colors.BLUE)
-        if time.time() - self.last_fall_time > 0.7:
-            self.active_shape.fall()
-            self.last_fall_time = time.time()
+                if self.is_shape_collide(self.shape):
+                    self.shape.move(0, -1)
+
+                    if self.shape.y == 0:
+                        self.run = False
+                        return self.score
+
+                    self.cells.add(self.shape.sprites())
+                    self.new_shape()
+
+                self.last_fall_time = time.time()
+
+                self.score += 1
+
+            for row in range(self.height - 1, 1, -1):
+                cells = []
+                for cell in self.cells:
+                    if cell.y == row:
+                        cells.append(cell)
+                if len(cells) == self.width:
+                    for cell in cells:
+                        cell.kill()
+                    for cell in self.cells:
+                        if cell.y < row:
+                            cell.move(0, 1)
+
+
+        else:
+            self.run = False
+
+
+        return self.score
 
     def start(self):
-        self.new_shape(tetris_shapes["L"], colors.BLUE)
+        self.run = True
+        self.new_shape()
+
+    def get_random_shape(self):
+        return Shape(tetris_shapes[random.choice(list(tetris_shapes.keys()))], colors.WHITE)
+
+    def new_shape(self):
+        self.shape = self.next_shape
+        self.next_shape = self.get_random_shape()
+
+    def action_left(self):
+        self.shape.move(-1, 0)
+        if self.is_shape_collide(self.shape):
+            self.shape.move(1, 0)
+
+    def action_right(self):
+        self.shape.move(1, 0)
+        if self.is_shape_collide(self.shape):
+            self.shape.move(-1, 0)
+
+    def action_rotate(self):
+        x, y = self.shape.x, self.shape.y
+        new_shape = Shape(rotate_matrix(self.shape.shape), colors.WHITE)
+        new_shape.move(x, y)
+        if self.is_shape_collide(new_shape):
+            new_shape.move(1, 0)
+            if self.is_shape_collide(new_shape):
+                new_shape.move(-2, 0)
+            if self.is_shape_collide(new_shape):
+                return
+        self.shape = new_shape
+
+    def is_shape_collide(self, shape):
+        other_cells = self.cells.copy()
+        for cell in shape:
+            other_cells.remove(cell)
+        if pygame.sprite.groupcollide(shape, other_cells, False, False):
+            return True
+        for cell in shape:
+            if not (0 <= cell.x < self.width) or not (0 <= cell.y < self.height):
+                return True
+
+    def set_tick(self, tick):
+        self.tick = tick
+
 
 field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width, field_height + 2)
 
@@ -188,33 +285,47 @@ field.start()
 
 clock = pygame.time.Clock()
 
-# start_screen()
+f1 = pygame.font.Font(None, 52)
+
+start_screen()
 
 while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             terminate()
         if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
-            field.active_shape.move_left()
+            field.action_left()
         if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
-            field.active_shape.move_right()
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == pygame.BUTTON_LEFT:
-                # all_sprites.update(event.pos)
-                field.get_click(event.pos)
+            field.action_right()
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+            field.action_rotate()
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+            field.set_tick(0.05)
+        if event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
+            field.set_tick(0.7)
         if event.type == pygame.MOUSEWHEEL:
             pass
 
     screen.fill(colors.BLACK)
 
-    field.update()
+    score = field.update()
     field.draw(screen)
+    print(score)
+    text1 = f1.render(str(score), True, (255, 255, 255))
+    screen.blit(text1, (20, 15))
 
-    # all_sprites.draw(screen)
-    # all_sprites.update()
-    # box_group.draw(screen)
-    # box_group.update()
-    # player_group.draw(screen)
-    # player_group.update()
+    pygame.draw.rect(screen, colors.WHITE, (WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2, HEIGHT / 2 - 150 / 2, 150, 150),
+                     width=1)
+    shape_preview = Shape(field.next_shape.shape, field.next_shape.color)
+    shape_preview.move(WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2 + 30, HEIGHT / 2 - 150 / 2 + 30, cell_based=False)
+    shape_preview.draw(screen)
+
+    if not field.run:
+        if game_over_screen(score):
+            field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width, field_height + 2)
+            field.start()
+        else:
+            terminate()
+
     pygame.display.flip()
     clock.tick(FPS)

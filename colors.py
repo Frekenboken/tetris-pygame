@@ -2,7 +2,7 @@ import pygame
 
 BLACK = pygame.Color(0, 0, 0)
 WHITE = pygame.Color(255, 255, 255)
-GRAY = pygame.Color(70, 70, 70)
+GRAY = pygame.Color(20, 20, 20)
 RED = pygame.Color(255, 0, 0)
 GREEN = pygame.Color(0, 255, 0)
 BLUE = pygame.Color(0, 0, 255)
