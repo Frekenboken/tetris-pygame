@@ -17,7 +17,7 @@ cell_size = 30
 SIZE = WIDTH, HEIGHT = (1000, 600)
 FPS = 50
 pygame.init()
-pygame.display.set_caption("Перемещение героя")
+pygame.display.set_caption("TETRIS")
 screen = pygame.display.set_mode(SIZE)
 
 player = None

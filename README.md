@@ -93,3 +93,7 @@
 - Язык программирования: Python
 - Игровой движок: PyGame
 - Другие библиотеки: random
+
+# Презентация 
+
+https://disk.yandex.ru/i/FyegqP1nwa4E3A
