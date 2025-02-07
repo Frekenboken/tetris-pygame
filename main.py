@@ -22,13 +22,16 @@ screen = pygame.display.set_mode(SIZE)
 
 player = None
 
+
 def game_over_screen(score):
     intro_text = ["ИГРА ОКОНЧЕНА", "",
                   f"Ваш счет: {score}",
                   "Нажмите R для перезапуска",
                   "Нажмите Q для выхода"]
 
-    fon = pygame.transform.scale(load_image('Default.jpg'), (WIDTH, HEIGHT))
+    # fon = pygame.transform.scale(load_image('Default.jpg'), (WIDTH, HEIGHT))
+    fon = pygame.surface.Surface(WIDTH, HEIGHT)
+    fon.fill(colors.BLUE)
     screen.blit(fon, (0, 0))
     font = pygame.font.Font(None, 30)
     text_coord = 50
@@ -53,40 +56,43 @@ def game_over_screen(score):
         pygame.display.flip()
         clock.tick(FPS)
 
+
 def start_screen():
     intro_text = ["ЗАСТАВКА", "",
                   "Правила игры",
                   "Если в правилах несколько строк,",
                   "приходится выводить их построчно"]
 
-    fon = pygame.transform.scale(load_image('Default.jpg'), (WIDTH, HEIGHT))
+    fon = pygame.transform.scale(load_image('start.png'), (WIDTH, HEIGHT))
     screen.blit(fon, (0, 0))
     font = pygame.font.Font(None, 30)
     text_coord = 50
-    for line in intro_text:
-        string_rendered = font.render(line, 1, pygame.Color('black'))
-        intro_rect = string_rendered.get_rect()
-        text_coord += 10
-        intro_rect.top = text_coord
-        intro_rect.x = 10
-        text_coord += intro_rect.height
-        screen.blit(string_rendered, intro_rect)
+    # for line in intro_text:
+    #     string_rendered = font.render(line, 1, colors.WHITE)
+    #     intro_rect = string_rendered.get_rect()
+    #     text_coord += 10
+    #     intro_rect.top = text_coord
+    #     intro_rect.x = 10
+    #     text_coord += intro_rect.height
+    #     screen.blit(string_rendered, intro_rect)
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            elif event.type == pygame.KEYDOWN or \
-                    event.type == pygame.MOUSEBUTTONDOWN:
-                return  # начинаем игру
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == pygame.BUTTON_LEFT:
+                    if pygame.rect.Rect(380, 265, 240, 70).collidepoint(event.pos):
+                        return 1
+                    elif pygame.rect.Rect(380, 393, 240, 70).collidepoint(event.pos):
+                        return 2
         pygame.display.flip()
         clock.tick(FPS)
 
 
-import pygame
-
 # Размер клетки по умолчанию
 CELL_SIZE = 30
+
 
 class Segment(pygame.sprite.Sprite):
     def __init__(self, sprite_group, pos_x, pos_y, color, scale=1.0):
@@ -229,7 +235,6 @@ class Field(Surface):
         else:
             self.run = False
 
-
         return self.score
 
     def start(self):
@@ -279,53 +284,61 @@ class Field(Surface):
         self.tick = tick
 
 
-field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width, field_height + 2)
-
-field.start()
-
 clock = pygame.time.Clock()
 
-f1 = pygame.font.Font(None, 52)
-
-start_screen()
+f1 = pygame.font.Font(None, 80)
 
 while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            terminate()
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
-            field.action_left()
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
-            field.action_right()
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
-            field.action_rotate()
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
-            field.set_tick(0.05)
-        if event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
-            field.set_tick(0.7)
-        if event.type == pygame.MOUSEWHEEL:
-            pass
+    mode = start_screen()
 
-    screen.fill(colors.BLACK)
+    game_running = True
 
-    score = field.update()
-    field.draw(screen)
-    print(score)
-    text1 = f1.render(str(score), True, (255, 255, 255))
-    screen.blit(text1, (20, 15))
+    field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width, field_height + 2)
 
-    pygame.draw.rect(screen, colors.WHITE, (WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2, HEIGHT / 2 - 150 / 2, 150, 150),
-                     width=1)
-    shape_preview = Shape(field.next_shape.shape, field.next_shape.color)
-    shape_preview.move(WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2 + 30, HEIGHT / 2 - 150 / 2 + 30, cell_based=False)
-    shape_preview.draw(screen)
+    field.start()
 
-    if not field.run:
-        if game_over_screen(score):
-            field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width, field_height + 2)
-            field.start()
-        else:
-            terminate()
+    while game_running:
+        screen.fill(colors.BLACK)
 
-    pygame.display.flip()
-    clock.tick(FPS)
+        score = field.update()
+        field.draw(screen)
+        text1 = f1.render(str(score), True, colors.WHITE)
+        screen.blit(text1, (20, 15))
+
+        pygame.draw.rect(screen, colors.WHITE, (WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2, HEIGHT / 2 - 150 / 2, 150, 150),
+                         width=1)
+        shape_preview = Shape(field.next_shape.shape, field.next_shape.color)
+        shape_preview.move(WIDTH / 3 * 2 + (WIDTH / 3 - 150) / 2 + 30, HEIGHT / 2 - 150 / 2 + 30, cell_based=False)
+        shape_preview.draw(screen)
+
+        menu_button = pygame.draw.rect(screen, colors.WHITE, (WIDTH / 3 / 4, HEIGHT * 0.85, WIDTH / 3 / 2, 50))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_LEFT:
+                field.action_left()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
+                field.action_right()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                field.action_rotate()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                field.set_tick(0.05)
+            if event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
+                field.set_tick(0.7)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == pygame.BUTTON_LEFT:
+                    print(pygame.rect.Rect(380, 265, 240, 70).collidepoint(event.pos))
+                    if menu_button.collidepoint(event.pos):
+                        game_running = False
+
+        if not field.run:
+            if game_over_screen(score):
+                field = Field(WIDTH // 2 - (field_width // 2 * cell_size), - 2 * cell_size, field_width,
+                              field_height + 2)
+                field.start()
+            else:
+                terminate()
+
+        pygame.display.flip()
+        clock.tick(FPS)
